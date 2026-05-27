@@ -1,0 +1,40 @@
+from langchain_nvidia_ai_endpoints import ChatNVIDIA
+from typing import List
+from app.config import settings
+
+_llm = None
+
+SYSTEM_PROMPT = """你是一个专业的医疗知识助手，专精于透析领域。
+请严格基于以下提供的文档内容来回答用户的问题。
+如果你无法从文档中找到答案，请明确说明"根据现有文档无法回答此问题"。
+在回答中适当引用文档原文作为依据。
+
+【参考文档内容】
+{context}
+
+【用户问题】
+{question}"""
+
+DISCLAIMER = "\n\n---\n*以上信息仅供参考，不构成医疗建议。如有身体不适，请及时就医。*"
+
+
+def _get_llm() -> ChatNVIDIA:
+    global _llm
+    if _llm is None:
+        _llm = ChatNVIDIA(
+            model=settings.nvidia_llm_model,
+            api_key=settings.nvidia_api_key,
+            temperature=0.3,
+            max_tokens=2048,
+        )
+    return _llm
+
+
+def answer_question(question: str, context_chunks: List[dict]) -> str:
+    llm = _get_llm()
+    context = "\n\n".join(
+        f"[来源 {i + 1}]: {c['content']}" for i, c in enumerate(context_chunks)
+    )
+    prompt = SYSTEM_PROMPT.format(context=context, question=question)
+    response = llm.invoke(prompt)
+    return response.content + DISCLAIMER
