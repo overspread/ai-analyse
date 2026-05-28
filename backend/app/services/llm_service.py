@@ -4,6 +4,14 @@ from app.config import settings
 
 _llm = None
 
+
+class MockLLM:
+    def invoke(self, prompt: str):
+        class MockResponse:
+            def __init__(self):
+                self.content = "这是一个测试回答。由于未配置有效的 NVIDIA API Key，当前使用模拟模式。"
+        return MockResponse()
+
 SYSTEM_PROMPT = """你是一个专业的医疗知识助手，专精于透析领域。
 请严格基于以下提供的文档内容来回答用户的问题。
 如果你无法从文档中找到答案，请明确说明"根据现有文档无法回答此问题"。
@@ -18,7 +26,7 @@ SYSTEM_PROMPT = """你是一个专业的医疗知识助手，专精于透析领�
 DISCLAIMER = "\n\n---\n*以上信息仅供参考，不构成医疗建议。如有身体不适，请及时就医。*"
 
 
-def _get_llm() -> ChatNVIDIA:
+def _get_llm():
     global _llm
     if _llm is None:
         _llm = ChatNVIDIA(

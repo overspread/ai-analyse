@@ -18,15 +18,10 @@ class MockEmbeddings:
 def _get_embedding():
     global _embedding
     if _embedding is None:
-        print(f"DEBUG: nvidia_api_key value is '{app_settings.nvidia_api_key}'")
-        if not app_settings.nvidia_api_key:
-            print("WARNING: nvidia_api_key is missing. Using MockEmbeddings for development.")
-            _embedding = MockEmbeddings()
-        else:
-            _embedding = NVIDIAEmbeddings(
-                model=app_settings.nvidia_embed_model,
-                api_key=app_settings.nvidia_api_key,
-            )
+        _embedding = NVIDIAEmbeddings(
+            model=app_settings.nvidia_embed_model,
+            api_key=app_settings.nvidia_api_key,
+        )
     return _embedding
 
 

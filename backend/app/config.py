@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     top_k: int = 5
     nvidia_llm_model: str = "meta/llama-3.1-70b-instruct"
-    nvidia_embed_model: str = "nvidia/nv-embed-qa-4"
+    nvidia_embed_model: str = "nvidia/nv-embedqa-e5-v5"
     max_file_size_mb: int = 20
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

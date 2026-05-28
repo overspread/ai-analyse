@@ -9,7 +9,7 @@
         :accept="'.pdf,.docx'"
         :max-size="20 * 1024 * 1024"
         :custom-request="handleUpload"
-        :default-upload="false"
+        :default-upload="true"
         list-type="text"
       >
         <n-upload-dragger>
@@ -22,6 +22,9 @@
           </div>
         </n-upload-dragger>
       </n-upload>
+      <div v-if="store.error" style="color: #d03050; font-size: 13px; margin-top: 12px; padding: 8px; background: #fff1f0; border: 1px solid #ffa39e; border-radius: 4px;">
+        ⚠️ 上传失败: {{ store.error }}
+      </div>
       <n-button
         v-if="store.documents.length > 0"
         type="primary"
