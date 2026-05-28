@@ -25,8 +25,10 @@ export const useAppStore = defineStore('app', () => {
       const res = await api.getDocuments()
       documents.value = res.items || []
     } catch (e: any) {
-      error.value = e?.response?.data?.detail || e.message || '获取文档列表失败'
+      const errorMsg = e?.message || e?.response?.data?.detail || '获取文档列表失败'
+      error.value = errorMsg
       console.error('fetchDocuments error:', e)
+      throw new Error(errorMsg)
     } finally {
       loading.value = false
     }
@@ -38,8 +40,10 @@ export const useAppStore = defineStore('app', () => {
       documents.value = documents.value.filter(d => d.id !== id)
       selectedDocIds.value = selectedDocIds.value.filter(d => d !== id)
     } catch (e: any) {
-      error.value = e?.response?.data?.detail || e.message || '删除失败'
-      throw e
+      const errorMsg = e?.message || e?.response?.data?.detail || '删除失败'
+      error.value = errorMsg
+      console.error('deleteDocument error:', e)
+      throw new Error(errorMsg)
     }
   }
 
@@ -47,11 +51,14 @@ export const useAppStore = defineStore('app', () => {
     loading.value = true
     error.value = null
     try {
-      await api.uploadFiles(files)
+      const result = await api.uploadFiles(files)
+      console.log('Upload result:', result)
       await fetchDocuments()
     } catch (e: any) {
-      error.value = e?.response?.data?.detail || e.message || '上传失败'
-      throw e
+      const errorMsg = e?.message || e?.response?.data?.detail || '上传失败'
+      error.value = errorMsg
+      console.error('uploadFiles error:', e)
+      throw new Error(errorMsg)
     } finally {
       loading.value = false
     }

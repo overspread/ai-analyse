@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useMessage } from 'naive-ui'
 import { api } from '../api'
 import { useAppStore } from '../stores/app'
@@ -80,9 +80,25 @@ const question = ref('')
 const sending = ref(false)
 const messages = ref<MessageItem[]>([])
 
+onMounted(async () => {
+  try {
+    await store.fetchDocuments()
+  } catch (e: any) {
+    console.error('Failed to load documents on mount:', e)
+    // Error is already handled in store
+  }
+})
+
 async function sendMessage() {
   const q = question.value.trim()
-  if (!q || store.selectedDocIds.length === 0) return
+  if (!q) {
+    message.warning('请输入问题')
+    return
+  }
+  if (store.selectedDocIds.length === 0) {
+    message.warning('请先选择要查询的文档')
+    return
+  }
 
   messages.value.push({ role: 'user', content: q })
   question.value = ''
@@ -92,8 +108,9 @@ async function sendMessage() {
     const res = await api.chat(q, store.selectedDocIds)
     messages.value.push({ role: 'assistant', content: res.answer, sources: res.sources })
   } catch (e: any) {
-    message.error(e?.response?.data?.detail || '请求失败')
-    messages.value.push({ role: 'assistant', content: '抱歉，请求出错，请稍后重试。' })
+    const errorMsg = e?.message || e?.response?.data?.detail || '请求失败，请稍后重试'
+    message.error(errorMsg)
+    messages.value.push({ role: 'assistant', content: `抱歉，${errorMsg}` })
   } finally {
     sending.value = false
   }

@@ -9,13 +9,24 @@ _client = None
 _collection = None
 
 
-def _get_embedding() -> NVIDIAEmbeddings:
+class MockEmbeddings:
+    def embed_documents(self, texts):
+        return [[0.1] * 1024 for _ in texts]
+    def embed_query(self, text):
+        return [0.1] * 1024
+
+def _get_embedding():
     global _embedding
     if _embedding is None:
-        _embedding = NVIDIAEmbeddings(
-            model=app_settings.nvidia_embed_model,
-            api_key=app_settings.nvidia_api_key,
-        )
+        print(f"DEBUG: nvidia_api_key value is '{app_settings.nvidia_api_key}'")
+        if not app_settings.nvidia_api_key:
+            print("WARNING: nvidia_api_key is missing. Using MockEmbeddings for development.")
+            _embedding = MockEmbeddings()
+        else:
+            _embedding = NVIDIAEmbeddings(
+                model=app_settings.nvidia_embed_model,
+                api_key=app_settings.nvidia_api_key,
+            )
     return _embedding
 
 
@@ -38,19 +49,33 @@ def add_document_chunks(
     chunks: List[str],
     metadata: Optional[List[dict]] = None,
 ):
+    if doc_id <= 0:
+        raise ValueError("doc_id must be positive")
     if not chunks:
-        return
-    collection = _get_collection()
-    embedding = _get_embedding()
-    ids = [f"doc{doc_id}_chunk{i}" for i in range(len(chunks))]
-    metadatas = metadata or [{"document_id": doc_id, "chunk_index": i} for i in range(len(chunks))]
-    vectors = embedding.embed_documents(chunks)
-    collection.add(
-        ids=ids,
-        embeddings=vectors,
-        documents=chunks,
-        metadatas=metadatas,
-    )
+        raise ValueError("chunks cannot be empty")
+    if not all(isinstance(chunk, str) for chunk in chunks):
+        raise ValueError("all chunks must be strings")
+    if not all(chunk.strip() for chunk in chunks):
+        raise ValueError("all chunks must be non-empty strings")
+    
+    try:
+        collection = _get_collection()
+        embedding = _get_embedding()
+        ids = [f"doc{doc_id}_chunk{i}" for i in range(len(chunks))]
+        metadatas = metadata or [{"document_id": doc_id, "chunk_index": i} for i in range(len(chunks))]
+        
+        vectors = embedding.embed_documents(chunks)
+        if not vectors or len(vectors) != len(chunks):
+            raise ValueError("Failed to generate embeddings for all chunks")
+        
+        collection.add(
+            ids=ids,
+            embeddings=vectors,
+            documents=chunks,
+            metadatas=metadatas,
+        )
+    except Exception as e:
+        raise ValueError(f"Failed to add document chunks to vector store: {str(e)}")
 
 
 def search_chunks(query: str, doc_ids: Optional[List[int]] = None, top_k: int = 5):

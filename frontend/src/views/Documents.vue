@@ -51,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, ref } from 'vue'
+import { h, ref, onMounted } from 'vue'
 import { NButton, NTag, useMessage, useDialog, type UploadCustomRequestOptions } from 'naive-ui'
 import { DocumentOutline } from '@vicons/ionicons5'
 import { useAppStore } from '../stores/app'
@@ -61,6 +61,15 @@ const store = useAppStore()
 const message = useMessage()
 const dialog = useDialog()
 const uploadRef = ref()
+
+onMounted(async () => {
+  try {
+    await store.fetchDocuments()
+  } catch (e: any) {
+    console.error('Failed to load documents on mount:', e)
+    // Error is already handled in store, just log it here
+  }
+})
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + ' B'
@@ -74,11 +83,43 @@ function formatTime(dateStr: string): string {
 
 async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOptions) {
   try {
+    if (!file.file) {
+      message.error('文件对象不存在')
+      onError()
+      return
+    }
+    
+    // Client-side validation
+    const maxSize = 20 * 1024 * 1024 // 20MB
+    if (file.file.size > maxSize) {
+      message.error(`文件大小超过20MB限制（当前：${formatSize(file.file.size)}）`)
+      onError()
+      return
+    }
+    
+    const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    if (!allowedTypes.includes(file.file.type)) {
+      message.error(`不支持的文件类型：${file.file.type || '未知'}，只支持PDF和DOCX格式`)
+      onError()
+      return
+    }
+    
+    if (file.file.size === 0) {
+      message.error('文件为空，请选择有效的文件')
+      onError()
+      return
+    }
+    
+    message.loading(`正在上传 "${file.name}"...`, { duration: 0, key: 'upload' })
     await store.uploadFiles([file.file])
+    message.destroyAll()
     message.success(`"${file.name}" 上传成功`)
     onFinish()
   } catch (e: any) {
-    message.error(e?.response?.data?.detail || store.error || '上传失败')
+    message.destroyAll()
+    const errorMsg = e?.message || store.error || '上传失败，请重试'
+    message.error(errorMsg)
+    console.error('Upload error:', e)
     onError()
   }
 }

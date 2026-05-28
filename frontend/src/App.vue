@@ -2,7 +2,7 @@
   <n-message-provider>
     <n-notification-provider>
       <n-dialog-provider>
-        <n-config-provider :theme="darkTheme ? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
+        <n-config-provider :theme="isDark ? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
           <n-layout position="absolute">
             <n-layout-header bordered style="height: 56px; display: flex; align-items: center; padding: 0 24px;">
               <n-h3 style="margin: 0; flex: 1;">AI 透析助手</n-h3>
@@ -13,9 +13,9 @@
                 <n-button :type="route.path === '/chat' ? 'primary' : 'default'" @click="$router.push('/chat')">
                   问答对话
                 </n-button>
-                <n-button quaternary circle @click="toggleDark">
+                <n-button quaternary circle @click="isDark = !isDark">
                   <template #icon>
-                    <n-icon><div v-if="darkTheme">☀️</div><div v-else>🌙</div></n-icon>
+                    <n-icon><div v-if="isDark">☀️</div><div v-else>🌙</div></n-icon>
                   </template>
                 </n-button>
               </n-space>
@@ -37,16 +37,12 @@ import { darkTheme, zhCN, dateZhCN } from 'naive-ui'
 import { useAppStore } from './stores/app'
 
 const route = useRoute()
-const darkTheme = ref(false)
+const isDark = ref(false)
 const store = useAppStore()
 
 onMounted(() => {
   store.fetchDocuments()
 })
-
-function toggleDark() {
-  darkTheme.value = !darkTheme.value
-}
 </script>
 
 <style>

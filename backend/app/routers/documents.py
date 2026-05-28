@@ -35,29 +35,41 @@ async def upload_files(files: list[UploadFile] = File(...), db: Session = Depend
         stored_name = f"{timestamp}_{file.filename}"
         file_path = os.path.join(settings.upload_dir, stored_name)
 
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(content)
+        try:
+            async with aiofiles.open(file_path, "wb") as f:
+                await f.write(content)
 
-        text = extract_text(file_path)
-        chunks = split_text(text, settings.chunk_size, settings.chunk_overlap)
-        content_preview = chunks[0][:200] if chunks else text[:200]
+            text = extract_text(file_path)
+            if not text or not text.strip():
+                raise HTTPException(400, f"Failed to extract text from {file.filename} - file may be empty or corrupted")
+            
+            chunks = split_text(text, settings.chunk_size, settings.chunk_overlap)
+            if not chunks:
+                raise HTTPException(400, f"Failed to split text from {file.filename} into chunks")
+            
+            content_preview = chunks[0][:200] if chunks else text[:200]
 
-        doc = Document(
-            filename=stored_name,
-            original_filename=file.filename,
-            file_path=file_path,
-            file_type=ext[1:],
-            file_size=file_size,
-            chunk_count=len(chunks),
-            content_preview=content_preview,
-        )
-        db.add(doc)
-        db.commit()
-        db.refresh(doc)
+            doc = Document(
+                filename=stored_name,
+                original_filename=file.filename,
+                file_path=file_path,
+                file_type=ext[1:],
+                file_size=file_size,
+                chunk_count=len(chunks),
+                content_preview=content_preview,
+            )
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
 
-        add_document_chunks(doc.id, chunks)
+            add_document_chunks(doc.id, chunks)
 
-        results.append(doc)
+            results.append(doc)
+        except Exception as e:
+            db.rollback()
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            raise HTTPException(500, f"Failed to process {file.filename}: {str(e)}")
     return results
 
 
