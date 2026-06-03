@@ -22,6 +22,27 @@
           </div>
         </n-upload-dragger>
       </n-upload>
+      <n-card
+        v-if="uploading"
+        size="small"
+        style="margin-top: 12px; background: var(--n-color-target);"
+      >
+        <n-space vertical :size="8">
+          <div style="display: flex; justify-content: space-between; gap: 12px;">
+            <span>{{ uploadStatusText }}</span>
+            <span>{{ uploadProgress }}%</span>
+          </div>
+          <n-progress
+            type="line"
+            :percentage="uploadProgress"
+            :processing="uploadProgress < 100 || processingUpload"
+            :indicator-placement="'inside'"
+          />
+          <n-text depth="3" style="font-size: 12px;">
+            {{ processingUpload ? '文件已传输完成，服务器正在解析文档并生成向量，请稍候。' : '正在上传文件到服务器。' }}
+          </n-text>
+        </n-space>
+      </n-card>
       <div v-if="store.error" style="color: #d03050; font-size: 13px; margin-top: 12px; padding: 8px; background: #fff1f0; border: 1px solid #ffa39e; border-radius: 4px;">
         ⚠️ 上传失败: {{ store.error }}
       </div>
@@ -54,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { h, ref, onMounted } from 'vue'
+import { computed, h, ref, onMounted } from 'vue'
 import { NButton, NTag, useMessage, useDialog, type UploadCustomRequestOptions } from 'naive-ui'
 import { DocumentOutline } from '@vicons/ionicons5'
 import { useAppStore } from '../stores/app'
@@ -64,6 +85,16 @@ const store = useAppStore()
 const message = useMessage()
 const dialog = useDialog()
 const uploadRef = ref()
+const uploading = ref(false)
+const processingUpload = ref(false)
+const uploadProgress = ref(0)
+
+const uploadStatusText = computed(() => {
+  if (processingUpload.value) {
+    return '上传完成，正在处理文档'
+  }
+  return '正在上传文档'
+})
 
 onMounted(async () => {
   try {
@@ -84,7 +115,7 @@ function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
-async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOptions) {
+async function handleUpload({ file, onFinish, onError, onProgress }: UploadCustomRequestOptions) {
   try {
     if (!file.file) {
       message.error('文件对象不存在')
@@ -113,8 +144,21 @@ async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOpti
       return
     }
     
-    message.loading(`正在上传 "${file.name}"...`, { duration: 0, key: 'upload' })
-    await store.uploadFiles([file.file])
+    uploading.value = true
+    processingUpload.value = false
+    uploadProgress.value = 0
+    message.loading(`正在上传 "${file.name}"...`, { duration: 0 })
+    await store.uploadFiles([file.file], {
+      onUploadProgress: (percent) => {
+        uploadProgress.value = percent
+        onProgress({ percent })
+        if (percent >= 100) {
+          processingUpload.value = true
+          message.destroyAll()
+          message.loading(`"${file.name}" 上传完成，正在处理文档...`, { duration: 0 })
+        }
+      },
+    })
     message.destroyAll()
     message.success(`"${file.name}" 上传成功`)
     onFinish()
@@ -124,6 +168,10 @@ async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOpti
     message.error(errorMsg)
     console.error('Upload error:', e)
     onError()
+  } finally {
+    uploading.value = false
+    processingUpload.value = false
+    uploadProgress.value = 0
   }
 }
 

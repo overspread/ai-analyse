@@ -56,8 +56,8 @@ NVIDIA_API_KEY=你的NVIDIA_API密钥
 
 启动服务：
 
-```bash
-uvicorn app.main:app --reload --port 8000
+```
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 API 文档访问 http://localhost:8000/docs

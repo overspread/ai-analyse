@@ -1,10 +1,12 @@
-import axios from 'axios'
+import axios, { type AxiosProgressEvent } from 'axios'
 import type { DocumentItem } from '../stores/app'
 
 const http = axios.create({
   baseURL: '/api',
   timeout: 120000,
 })
+
+const UPLOAD_TIMEOUT = 10 * 60 * 1000
 
 // Add request interceptor for error handling
 http.interceptors.request.use(
@@ -28,7 +30,9 @@ http.interceptors.response.use(
     console.error('API Response Error:', error)
     
     if (error.code === 'ECONNABORTED') {
-      error.message = '请求超时，请检查网络连接或稍后重试'
+      error.message = error.config?.url?.includes('/documents/upload')
+        ? '上传或文档处理超时，请稍后重试，或尝试更小的文件'
+        : '请求超时，请检查网络连接或稍后重试'
     } else if (error.response) {
       // Server responded with error status
       const status = error.response.status
@@ -75,8 +79,12 @@ export interface ChatHistoryItem {
   created_at: string
 }
 
+export interface UploadFilesOptions {
+  onUploadProgress?: (percent: number) => void
+}
+
 export const api = {
-  async uploadFiles(files: File[]): Promise<DocumentItem[]> {
+  async uploadFiles(files: File[], options: UploadFilesOptions = {}): Promise<DocumentItem[]> {
     if (!files || files.length === 0) {
       throw new Error('请选择要上传的文件')
     }
@@ -88,7 +96,15 @@ export const api = {
       const res = await http.post<DocumentItem[]>('/documents/upload', form, {
         headers: {
           'Content-Type': 'multipart/form-data'
-        }
+        },
+        timeout: UPLOAD_TIMEOUT,
+        onUploadProgress: (event: AxiosProgressEvent) => {
+          if (!options.onUploadProgress || !event.total) {
+            return
+          }
+          const percent = Math.min(100, Math.round((event.loaded / event.total) * 100))
+          options.onUploadProgress(percent)
+        },
       })
       return res.data
     } catch (error: any) {
