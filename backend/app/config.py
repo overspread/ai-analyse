@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     top_k: int = 5
     nvidia_llm_model: str = "minimaxai/minimax-m2.7"
     nvidia_embed_model: str = "nvidia/nv-embedqa-e5-v5"
-    max_file_size_mb: int = 20
+    max_file_size_mb: int = 50
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

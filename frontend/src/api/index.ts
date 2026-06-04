@@ -64,6 +64,7 @@ export interface SourceChunk {
   document_name: string
   content: string
   score: number
+  page_number?: number | null
 }
 
 export interface ChatResponse {

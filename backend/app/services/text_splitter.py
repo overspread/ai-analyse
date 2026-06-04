@@ -1,5 +1,5 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from typing import List
+from typing import List, Dict
 
 SEPARATORS = ["\n\n", "\n", "。", "；", "，", " ", ""]
 MAX_SAFE_CHARS = 240
@@ -7,37 +7,46 @@ DEFAULT_CHUNK_SIZE = 220
 DEFAULT_CHUNK_OVERLAP = 30
 
 
-def split_text(
-    text: str,
-    chunk_size: int = DEFAULT_CHUNK_SIZE,
-    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
-) -> List[str]:
-    if not text or not text.strip():
-        raise ValueError("Cannot split empty text")
+def split_text(pages: List[Dict], chunk_size: int = 400, chunk_overlap: int = 50) -> List[Dict]:
+    if not pages:
+        raise ValueError("Cannot split empty pages")
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
     if chunk_overlap < 0:
         raise ValueError("chunk_overlap must be non-negative")
     if chunk_overlap >= chunk_size:
         raise ValueError("chunk_overlap must be less than chunk_size")
-
-    safe_chunk_size = min(chunk_size, DEFAULT_CHUNK_SIZE, MAX_SAFE_CHARS)
-    safe_chunk_overlap = min(chunk_overlap, DEFAULT_CHUNK_OVERLAP, safe_chunk_size - 1)
-    text_splitter = _build_splitter(safe_chunk_size, safe_chunk_overlap)
-    chunks = text_splitter.split_text(text)
-    if not chunks:
-        raise ValueError("Text splitting produced no chunks")
-    filtered_chunks = [c.strip() for c in chunks if c.strip()]
-    if not filtered_chunks:
+    
+    separators = ["\n\n", "\n", "。", "；", "，", " ", ""]
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=separators,
+        length_function=_count_tokens,
+    )
+    
+    result = []
+    for page in pages:
+        page_number = page["page_number"]
+        text = page["text"]
+        if not text or not text.strip():
+            continue
+        page_chunks = text_splitter.split_text(text)
+        for chunk in page_chunks:
+            stripped = chunk.strip()
+            if stripped:
+                result.append({
+                    "page_number": page_number,
+                    "text": stripped,
+                })
+    
+    if not result:
         raise ValueError("All chunks were empty after filtering")
+    return result
 
-    safe_chunks = []
-    for chunk in filtered_chunks:
-        safe_chunks.extend(_ensure_safe_chunk(chunk, safe_chunk_overlap))
 
-    if not safe_chunks:
-        raise ValueError("Text splitting produced no safe chunks")
-    return safe_chunks
+def _count_tokens(text: str) -> int:
+    return len(text)
 
 
 def _build_splitter(chunk_size: int, chunk_overlap: int) -> RecursiveCharacterTextSplitter:

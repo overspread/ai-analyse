@@ -5,7 +5,8 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/documents',
+      name: 'Unified',
+      component: () => import('../views/PageUnified.vue'),
     },
     {
       path: '/documents',

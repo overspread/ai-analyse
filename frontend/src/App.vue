@@ -31,14 +31,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { onMounted } from 'vue'
 import { darkTheme, zhCN, dateZhCN } from 'naive-ui'
 import { useAppStore } from './stores/app'
+import { ref } from 'vue'
 
-const route = useRoute()
-const isDark = ref(false)
 const store = useAppStore()
+const isDark = ref(false)
 
 onMounted(() => {
   store.fetchDocuments()
@@ -46,6 +45,26 @@ onMounted(() => {
 </script>
 
 <style>
-body { margin: 0; }
-#app { height: 100vh; }
+body {
+  margin: 0;
+  background: #0a0e1a;
+}
+#app {
+  height: 100vh;
+  background: #0a0e1a;
+}
+/* Override global Naive UI defaults for dark theme */
+:root {
+  --n-color: #0a0e1a;
+  --n-text-color: rgba(255, 255, 255, 0.8);
+  --border-color: rgba(255, 255, 255, 0.06);
+}
+.n-layout {
+  --n-color: #0a0e1a !important;
+}
+.n-layout-sider,
+.n-layout-header,
+.n-layout-content {
+  --n-color: #0a0e1a !important;
+}
 </style>
