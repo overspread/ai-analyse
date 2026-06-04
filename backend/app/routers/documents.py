@@ -1,4 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 import aiofiles
@@ -39,15 +40,15 @@ async def upload_files(files: list[UploadFile] = File(...), db: Session = Depend
             async with aiofiles.open(file_path, "wb") as f:
                 await f.write(content)
 
-            text = extract_text(file_path)
-            if not text or not text.strip():
+            pages = extract_text(file_path)
+            if not pages:
                 raise HTTPException(400, f"Failed to extract text from {file.filename} - file may be empty or corrupted")
             
-            chunks = split_text(text, settings.chunk_size, settings.chunk_overlap)
+            chunks = split_text(pages, settings.chunk_size, settings.chunk_overlap)
             if not chunks:
                 raise HTTPException(400, f"Failed to split text from {file.filename} into chunks")
             
-            content_preview = chunks[0][:200] if chunks else text[:200]
+            content_preview = chunks[0]["text"][:200] if chunks else pages[0]["text"][:200]
 
             doc = Document(
                 filename=stored_name,
@@ -77,6 +78,17 @@ async def upload_files(files: list[UploadFile] = File(...), db: Session = Depend
 def list_documents(db: Session = Depends(get_db)):
     items = db.query(Document).order_by(Document.created_at.desc()).all()
     return {"total": len(items), "items": items}
+
+
+@router.get("/{doc_id}/file")
+def get_document_file(doc_id: int, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    if not os.path.exists(doc.file_path):
+        raise HTTPException(404, "File not found on disk")
+    media_type = "application/pdf" if doc.file_type == "pdf" else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return FileResponse(doc.file_path, media_type=media_type, filename=doc.original_filename)
 
 
 @router.delete("/{doc_id}")

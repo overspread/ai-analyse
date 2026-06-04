@@ -33,6 +33,7 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
             document_name=next((d.original_filename for d in docs if d.id == c["document_id"]), "Unknown"),
             content=c["content"],
             score=round(c["score"], 4),
+            page_number=c.get("page_number"),
         )
         for c in chunks
     ]

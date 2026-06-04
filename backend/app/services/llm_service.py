@@ -29,12 +29,16 @@ DISCLAIMER = "\n\n---\n*以上信息仅供参考，不构成医疗建议。如�
 def _get_llm():
     global _llm
     if _llm is None:
-        _llm = ChatNVIDIA(
-            model=settings.nvidia_llm_model,
-            api_key=settings.nvidia_api_key,
-            temperature=0.3,
-            max_tokens=2048,
-        )
+        if not settings.nvidia_api_key:
+            print("[LLM] No API key configured, using mock LLM")
+            _llm = MockLLM()
+        else:
+            _llm = ChatNVIDIA(
+                model=settings.nvidia_llm_model,
+                api_key=settings.nvidia_api_key,
+                temperature=0.3,
+                max_tokens=2048,
+            )
     return _llm
 
 

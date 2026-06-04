@@ -1,6 +1,6 @@
 import datetime
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 
 
 class DocumentResponse(BaseModel):
@@ -30,6 +30,7 @@ class SourceChunk(BaseModel):
     document_name: str
     content: str
     score: float
+    page_number: Optional[int] = None
 
 
 class ChatResponse(BaseModel):

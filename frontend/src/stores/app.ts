@@ -15,6 +15,7 @@ export interface DocumentItem {
 export const useAppStore = defineStore('app', () => {
   const documents = ref<DocumentItem[]>([])
   const selectedDocIds = ref<number[]>([])
+  const currentDocId = ref<number | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -54,6 +55,7 @@ export const useAppStore = defineStore('app', () => {
       const result = await api.uploadFiles(files)
       console.log('Upload result:', result)
       await fetchDocuments()
+      return result
     } catch (e: any) {
       const errorMsg = e?.message || e?.response?.data?.detail || '上传失败'
       error.value = errorMsg
@@ -65,7 +67,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
-    documents, selectedDocIds, loading, error,
+    documents, selectedDocIds, currentDocId, loading, error,
     fetchDocuments, deleteDocument, uploadFiles,
   }
 })

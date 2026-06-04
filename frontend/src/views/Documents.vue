@@ -7,7 +7,7 @@
         ref="uploadRef"
         multiple
         :accept="'.pdf,.docx'"
-        :max-size="20 * 1024 * 1024"
+        :max-size="50 * 1024 * 1024"
         :custom-request="handleUpload"
         :default-upload="true"
         list-type="text"
@@ -18,7 +18,7 @@
               <document-outline />
             </n-icon>
             <n-p>拖拽 PDF 或 Word 文件到此处，或点击上传</n-p>
-            <n-p depth="3" style="font-size: 12px;">支持 PDF、DOCX，单文件最大 20MB</n-p>
+            <n-p depth="3" style="font-size: 12px;">支持 PDF、DOCX，单文件最大 50MB</n-p>
           </div>
         </n-upload-dragger>
       </n-upload>
@@ -93,9 +93,9 @@ async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOpti
     }
     
     // Client-side validation
-    const maxSize = 20 * 1024 * 1024 // 20MB
+    const maxSize = 50 * 1024 * 1024 // 50MB
     if (file.file.size > maxSize) {
-      message.error(`文件大小超过20MB限制（当前：${formatSize(file.file.size)}）`)
+      message.error(`文件大小超过50MB限制（当前：${formatSize(file.file.size)}）`)
       onError()
       return
     }
@@ -113,7 +113,7 @@ async function handleUpload({ file, onFinish, onError }: UploadCustomRequestOpti
       return
     }
     
-    message.loading(`正在上传 "${file.name}"...`, { duration: 0, key: 'upload' })
+    message.loading(`正在上传 "${file.name}"...`, { duration: 0 } as any)
     await store.uploadFiles([file.file])
     message.destroyAll()
     message.success(`"${file.name}" 上传成功`)
