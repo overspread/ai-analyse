@@ -33,7 +33,7 @@ def _get_collection():
             settings=ChromaSettings(anonymized_telemetry=False),
         )
         _collection = _client.get_or_create_collection(
-            name="dialysis_docs",
+            name="analyse_docs",
             metadata={"hnsw:space": "cosine"},
         )
     return _collection

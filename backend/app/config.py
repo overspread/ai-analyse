@@ -5,7 +5,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     nvidia_api_key: str = ""
     chroma_persist_dir: str = "../chroma_db"
-    database_url: str = "sqlite:///./dialysis.db"
+    database_url: str = "sqlite:///./ai_analyse.db"
     upload_dir: str = "./uploads"
     chunk_size: int = 220
     chunk_overlap: int = 30

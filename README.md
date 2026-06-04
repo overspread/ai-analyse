@@ -1,4 +1,4 @@
-# AI 透析助手
+# AI 分析助手
 
 基于 RAG（检索增强生成）的智能透析知识问答系统，支持上传 PDF/DOCX 文档，通过自然语言提问获取基于文档上下文的精准回答。
 
@@ -81,7 +81,7 @@ npm run dev
 ## 注意事项
 
 - **NVIDIA_API_KEY** 必须配置，否则无法使用 Embedding 和 LLM 功能
-- 后端默认使用 SQLite，数据存储在 `backend/dialysis.db`
+- 后端默认使用 SQLite，数据存储在 `backend/ai_analyse.db`
 - ChromaDB 向量数据存储在 `chroma_db/` 目录
 - 前端开发时通过 Vite 代理 `/api` 请求到后端，避免跨域问题
 - 支持文件格式：`.pdf`、`.docx`，单文件最大 20MB
