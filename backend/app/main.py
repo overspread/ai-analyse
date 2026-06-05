@@ -1,9 +1,34 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import init_db
+from contextlib import asynccontextmanager
+from app.database import init_db, SessionLocal
 from app.routers import documents, chat
+from app.models import UploadTask
+import datetime
 
-app = FastAPI(title="AI Dialysis Assistant", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    db = SessionLocal()
+    try:
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
+        stale = db.query(UploadTask).filter(
+            UploadTask.status.in_(["processing", "parsing"]),
+            UploadTask.updated_at < cutoff,
+        ).all()
+        for t in stale:
+            t.status = "failed"
+            t.error_message = "服务重启，任务已中断"
+            t.stage = "已中断"
+        if stale:
+            db.commit()
+    finally:
+        db.close()
+    yield
+
+
+app = FastAPI(title="AI Dialysis Assistant", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,11 +40,6 @@ app.add_middleware(
 
 app.include_router(documents.router)
 app.include_router(chat.router)
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 
 @app.get("/")

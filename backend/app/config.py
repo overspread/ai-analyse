@@ -5,12 +5,12 @@ from pathlib import Path
 class Settings(BaseSettings):
     nvidia_api_key: str = ""
     chroma_persist_dir: str = "../chroma_db"
-    database_url: str = "sqlite:///./dialysis.db"
+    database_url: str = "sqlite:///./ai_analyse.db"
     upload_dir: str = "./uploads"
-    chunk_size: int = 400
-    chunk_overlap: int = 50
+    chunk_size: int = 220
+    chunk_overlap: int = 30
     top_k: int = 5
-    nvidia_llm_model: str = "meta/llama-3.1-70b-instruct"
+    nvidia_llm_model: str = "minimaxai/minimax-m2.7"
     nvidia_embed_model: str = "nvidia/nv-embedqa-e5-v5"
     max_file_size_mb: int = 50
 

@@ -8,6 +8,8 @@ _embedding = None
 _client = None
 _collection = None
 
+BATCH_SIZE = 10
+
 
 class MockEmbeddings:
     def embed_documents(self, texts):
@@ -37,7 +39,7 @@ def _get_collection():
             settings=ChromaSettings(anonymized_telemetry=False),
         )
         _collection = _client.get_or_create_collection(
-            name="dialysis_docs",
+            name="analyse_docs",
             metadata={"hnsw:space": "cosine"},
         )
     return _collection
@@ -47,6 +49,7 @@ def add_document_chunks(
     doc_id: int,
     chunks: List[dict],
     metadata: Optional[List[dict]] = None,
+    progress_callback=None,
 ):
     if doc_id <= 0:
         raise ValueError("doc_id must be positive")
@@ -60,8 +63,6 @@ def add_document_chunks(
     try:
         collection = _get_collection()
         embedding = _get_embedding()
-        texts = [c["text"] for c in chunks]
-        ids = [f"doc{doc_id}_chunk{i}" for i in range(len(chunks))]
         
         if metadata:
             metadatas = metadata
@@ -71,16 +72,28 @@ def add_document_chunks(
                 for i, c in enumerate(chunks)
             ]
         
-        vectors = embedding.embed_documents(texts)
-        if not vectors or len(vectors) != len(chunks):
-            raise ValueError("Failed to generate embeddings for all chunks")
-        
-        collection.add(
-            ids=ids,
-            embeddings=vectors,
-            documents=texts,
-            metadatas=metadatas,
-        )
+        total = len(chunks)
+        for i in range(0, total, BATCH_SIZE):
+            batch = chunks[i:i + BATCH_SIZE]
+            batch_texts = [c["text"] for c in batch]
+            batch_ids = [f"doc{doc_id}_chunk{j}" for j in range(i, i + len(batch))]
+            batch_metadatas = metadatas[i:i + BATCH_SIZE]
+            
+            vectors = embedding.embed_documents(batch_texts)
+            if not vectors or len(vectors) != len(batch):
+                raise ValueError("Failed to generate embeddings for batch")
+            
+            collection.add(
+                ids=batch_ids,
+                embeddings=vectors,
+                documents=batch_texts,
+                metadatas=batch_metadatas,
+            )
+            
+            if progress_callback:
+                done = min(i + BATCH_SIZE, total)
+                pct = int((done / total) * 100)
+                progress_callback(pct)
     except Exception as e:
         raise ValueError(f"Failed to add document chunks to vector store: {str(e)}")
 

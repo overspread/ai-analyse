@@ -48,11 +48,11 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function uploadFiles(files: File[]) {
+  async function uploadFiles(files: File[], options?: { onUploadProgress?: (percent: number) => void }) {
     loading.value = true
     error.value = null
     try {
-      const result = await api.uploadFiles(files)
+      const result = await api.uploadFiles(files, options)
       console.log('Upload result:', result)
       await fetchDocuments()
       return result

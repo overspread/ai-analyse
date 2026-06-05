@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
 
 
 def init_db():
-    from app.models import Document, ChatHistory
+    from app.models import Document, ChatHistory, UploadTask
     Base.metadata.create_all(bind=engine)
 
 

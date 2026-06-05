@@ -1,240 +1,180 @@
 <template>
   <div class="parsing-wrapper">
-    <div class="file-card">
-      <div class="scan-area">
-        <div class="scan-line"></div>
-        <div class="scan-glow"></div>
+    <div class="upload-card">
+      <div class="file-header">
+        <div class="file-icon" :class="phase">
+          <svg v-if="phase === 'uploading'" width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M12 16V4M12 4L6 10M12 4L18 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16V19C4 20.1 4.9 21 6 21H18C19.1 21 20 20.1 20 19V16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg v-else width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M9 12L11 14L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="file-meta">
+          <div class="file-name" :title="fileName">{{ fileName }}</div>
+          <div class="file-size-row">
+            <span class="file-size">{{ phase === 'uploading' ? uploaded : fileSize }}</span>
+          </div>
+        </div>
       </div>
-      <div class="file-icon">
-        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-          <path d="M6 4H20L26 10V26C26 27.1 25.1 28 24 28H6C4.9 28 4 27.1 4 26V6C4 4.9 4.9 4 6 4Z" stroke="#00d4ff" stroke-width="1.5" fill="rgba(0,212,255,0.05)"/>
-          <path d="M14 14V22M10 18H18" stroke="#00d4ff" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
+
+      <div v-if="phase === 'uploading'" class="phase-section">
+        <div class="step-header">
+          <div class="step-badge active">1</div>
+          <span class="step-label">上传文件</span>
+          <span class="step-percent">{{ uploadPercent }}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill upload-color" :style="{ width: uploadPercent + '%' }">
+            <div class="progress-shimmer"></div>
+          </div>
+        </div>
+        <div class="stage-row">
+          <div class="stage-indicator">
+            <span class="stage-dot uploading"></span>
+            <span class="stage-text">{{ stage }}</span>
+          </div>
+          <div v-if="speed" class="speed-text">{{ speed }} · 剩余 {{ eta }}</div>
+        </div>
       </div>
-      <div class="file-info">
-        <span class="file-name">{{ fileName }}</span>
-        <span class="file-size">{{ fileSize }}</span>
+
+      <div v-if="phase === 'parsing'" class="phase-section">
+        <div class="step-header">
+          <div class="step-badge done">1</div>
+          <span class="step-label done-label">上传文件</span>
+          <span class="step-check">✓</span>
+        </div>
+        <div class="step-header">
+          <div class="step-badge active">2</div>
+          <span class="step-label">AI 处理</span>
+          <span class="step-percent">{{ processingPercent }}%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill parse-color" :style="{ width: processingPercent + '%' }">
+            <div class="progress-shimmer"></div>
+          </div>
+        </div>
+        <div class="stage-row">
+          <div class="stage-indicator">
+            <span class="stage-dot parsing"></span>
+            <span class="stage-text">{{ stage }}</span>
+          </div>
+        </div>
       </div>
-      <div class="progress-track">
-        <div class="progress-fill" :style="{ width: progress + '%' }"></div>
-      </div>
-      <div class="status-text">{{ statusText }}</div>
-    </div>
-    <div class="fiber-lines">
-      <div v-for="i in 6" :key="i" class="fiber" :style="fiberStyle(i)"></div>
-    </div>
-    <div class="particles-container">
-      <div
-        v-for="i in 12"
-        :key="i"
-        class="particle"
-        :style="particleStyle(i)"
-      ></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 
 const props = defineProps<{
   fileName: string
   fileSize: string
+  uploaded: string
   progress: number
+  stage?: string
+  phase: 'uploading' | 'parsing'
 }>()
 
-const statusText = computed(() => {
-  if (props.progress < 30) return '正在接收数据流...'
-  if (props.progress < 60) return 'AI 量子引擎解析中...'
-  if (props.progress < 90) return '构建语义索引...'
-  return '准备就绪'
+const uploadPercent = computed(() => props.phase !== 'uploading' ? 100 : Math.min(100, props.progress))
+const processingPercent = computed(() => props.phase !== 'parsing' ? 0 : Math.min(100, props.progress))
+
+let lastLoaded = 0
+let lastTime = Date.now()
+const speedMbps = ref(0)
+let speedTimer: ReturnType<typeof setInterval> | null = null
+
+function parseSize(s: string): number {
+  const m = s.match(/^([\d.]+)\s*(B|KB|MB|GB)$/i)
+  if (!m) return 0
+  const v = parseFloat(m[1]); const u = m[2].toUpperCase()
+  if (u === 'B') return v
+  if (u === 'KB') return v * 1024
+  if (u === 'MB') return v * 1024 * 1024
+  if (u === 'GB') return v * 1024 * 1024 * 1024
+  return 0
+}
+
+watch(() => props.uploaded, () => {
+  if (speedTimer) return
+  speedTimer = setInterval(() => {
+    const now = Date.now(); const elapsed = (now - lastTime) / 1000
+    if (elapsed > 0) {
+      const curLoaded = parseSize(props.uploaded); const diff = curLoaded - lastLoaded
+      if (diff > 0) speedMbps.value = diff / elapsed / 1024 / 1024
+    }
+    lastTime = now; lastLoaded = parseSize(props.uploaded)
+  }, 1000)
 })
 
-function fiberStyle(i: number) {
-  const angle = 200 + i * 8
-  const delay = i * 0.3
-  return {
-    transform: `rotate(${angle}deg)`,
-    animationDelay: `${delay}s`,
-  }
-}
+onBeforeUnmount(() => { if (speedTimer) clearInterval(speedTimer) })
 
-function particleStyle(i: number) {
-  const top = 20 + Math.random() * 60
-  const delay = i * 0.4
-  const duration = 1.5 + Math.random() * 2
-  const size = 2 + Math.random() * 3
-  return {
-    top: `${top}%`,
-    animationDelay: `${delay}s`,
-    animationDuration: `${duration}s`,
-    width: `${size}px`,
-    height: `${size}px`,
-  }
-}
+const speed = computed(() => {
+  if (props.phase !== 'uploading') return ''
+  if (speedMbps.value >= 1) return `${speedMbps.value.toFixed(1)} MB/s`
+  if (speedMbps.value > 0) return `${(speedMbps.value * 1024).toFixed(0)} KB/s`
+  return ''
+})
+
+const eta = computed(() => {
+  if (props.phase !== 'uploading' || !speedMbps.value) return '计算中'
+  const remaining = parseSize(props.fileSize) - parseSize(props.uploaded)
+  if (remaining <= 0) return '即将完成'
+  const sec = remaining / 1024 / 1024 / speedMbps.value
+  if (sec < 60) return `${Math.ceil(sec)}秒`
+  return `${Math.ceil(sec / 60)}分钟`
+})
 </script>
 
 <style scoped>
 .parsing-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
+  display: flex; align-items: center; justify-content: center; height: 100%; padding: 24px;
+  background: linear-gradient(135deg, #0a0e1a, #131829);
 }
-
-.file-card {
-  position: relative;
-  z-index: 2;
-  width: 360px;
-  padding: 24px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 40px rgba(0, 212, 255, 0.08);
+.upload-card {
+  width: 100%; max-width: 520px; padding: 32px; border-radius: 20px;
+  background: rgba(20,25,45,0.6); backdrop-filter: blur(20px);
+  border: 1px solid rgba(0,212,255,0.1);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(0,212,255,0.05);
 }
-
-.scan-area {
-  position: absolute;
-  inset: 0;
-  border-radius: 16px;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.scan-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #00ff88, transparent);
-  box-shadow: 0 0 12px rgba(0, 255, 136, 0.6), 0 0 24px rgba(0, 255, 136, 0.3);
-  animation: scanDown 2.5s ease-in-out infinite;
-}
-
-.scan-glow {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 80px;
-  background: linear-gradient(180deg, transparent, rgba(0, 255, 136, 0.03), transparent);
-  animation: glowDown 2.5s ease-in-out infinite;
-}
-
-@keyframes scanDown {
-  0% { top: -2px; }
-  100% { top: 100%; }
-}
-
-@keyframes glowDown {
-  0% { top: -80px; }
-  100% { top: 100%; }
-}
-
+.file-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
 .file-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
+  flex-shrink: 0; width: 52px; height: 52px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(123,47,247,0.15));
+  color: #00d4ff; border: 1px solid rgba(0,212,255,0.2);
 }
-
-.file-info {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 16px;
-}
-
-.file-name {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 15px;
-  font-weight: 500;
-  text-align: center;
-  word-break: break-all;
-}
-
-.file-size {
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 12px;
-}
-
-.progress-track {
-  height: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 12px;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #00d4ff, #7b2ff7);
-  border-radius: 2px;
-  transition: width 0.5s ease;
-  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
-}
-
-.status-text {
-  text-align: center;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 2px;
-}
-
-.fiber-lines {
-  position: absolute;
-  right: 30px;
-  top: 0;
-  bottom: 0;
-  width: 120px;
-  pointer-events: none;
-}
-
-.fiber {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  width: 120px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.15), transparent);
-  transform-origin: right center;
-  animation: fiberPulse 2s ease-in-out infinite;
-}
-
-@keyframes fiberPulse {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 0.8; }
-}
-
-.particles-container {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  pointer-events: none;
-}
-
-.particle {
-  position: absolute;
-  right: 0;
-  border-radius: 50%;
-  background: rgba(0, 212, 255, 0.6);
-  box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
-  animation: particleFly 2.5s ease-out infinite;
-}
-
-@keyframes particleFly {
-  0% {
-    transform: translateX(0) translateY(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(-400px) translateY(-20px);
-    opacity: 0;
-  }
-}
+.file-icon.parsing { color: #7b2ff7; background: linear-gradient(135deg,rgba(123,47,247,0.15),rgba(0,212,255,0.15)); border-color: rgba(123,47,247,0.2); }
+.file-icon.uploading { animation: iconPulse 2s ease-in-out infinite; }
+@keyframes iconPulse { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+.file-meta { flex: 1; min-width: 0; }
+.file-name { color: rgba(255,255,255,0.92); font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+.file-size-row { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,0.5); font-size: 12px; }
+.file-size { font-variant-numeric: tabular-nums; }
+.phase-section { margin-bottom: 12px; }
+.step-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.step-badge { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.step-badge.active { background: linear-gradient(135deg,#00d4ff,#7b2ff7); color: white; box-shadow: 0 0 12px rgba(0,212,255,0.4); }
+.step-badge.done { background: #00d4ff; color: white; box-shadow: 0 0 8px rgba(0,212,255,0.3); }
+.step-label { flex: 1; color: rgba(255,255,255,0.7); font-size: 13px; }
+.step-label.done-label { color: rgba(255,255,255,0.4); text-decoration: line-through; }
+.step-check { color: #00d4ff; font-size: 14px; font-weight: 600; }
+.step-percent { color: #00d4ff; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.progress-track { height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+.progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s ease; position: relative; overflow: hidden; }
+.progress-fill.upload-color { background: linear-gradient(90deg,#00d4ff,#0099cc); }
+.progress-fill.parse-color { background: linear-gradient(90deg,#7b2ff7,#b44dff); }
+.progress-shimmer { position: absolute; inset: 0; background: linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.3) 50%,transparent 100%); animation: shimmer 1.5s infinite; }
+@keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+.stage-row { display: flex; justify-content: space-between; align-items: center; min-height: 20px; }
+.stage-indicator { display: flex; align-items: center; gap: 8px; }
+.stage-dot { width: 6px; height: 6px; border-radius: 50%; animation: dotPulse 1.5s ease-in-out infinite; }
+.stage-dot.uploading { background: #00d4ff; box-shadow: 0 0 8px #00d4ff; }
+.stage-dot.parsing { background: #b44dff; box-shadow: 0 0 8px #b44dff; }
+@keyframes dotPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+.stage-text { color: rgba(255,255,255,0.6); font-size: 12px; letter-spacing: 0.3px; }
+.speed-text { color: rgba(255,255,255,0.35); font-size: 11px; font-variant-numeric: tabular-nums; }
 </style>
