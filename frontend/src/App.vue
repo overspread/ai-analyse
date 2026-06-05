@@ -32,11 +32,13 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { darkTheme, zhCN, dateZhCN } from 'naive-ui'
 import { useAppStore } from './stores/app'
 import { ref } from 'vue'
 
 const store = useAppStore()
+const route = useRoute()
 const isDark = ref(false)
 
 onMounted(() => {

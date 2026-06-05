@@ -46,3 +46,18 @@ class ChatHistoryResponse(BaseModel):
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+
+class UploadTaskResponse(BaseModel):
+    task_id: str
+    original_filename: str
+    file_size: int
+    status: str
+    progress: int
+    stage: str
+    doc_id: Optional[int] = None
+    error_message: str = ""
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
