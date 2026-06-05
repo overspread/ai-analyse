@@ -186,7 +186,7 @@ async function resumeUpload(file: File): Promise<boolean> {
   currentStage.value = '恢复上传...'
   try {
     await api.uploadFileForTask(local.taskId, file, {
-      onUploadProgress: (loaded, total) => {
+      onUploadProgress: (loaded, total = 0) => {
         currentUploaded.value = loaded
         currentProgress.value = Math.min(100, Math.round((loaded / total) * 100))
         currentStage.value = '上传文件'
@@ -224,7 +224,7 @@ async function startFreshUpload(file: File) {
     saveLocalState(task.task_id, file.name, file.size, 'uploading', 0, 0)
 
     await api.uploadFileForTask(task.task_id, file, {
-      onUploadProgress: (loaded, total) => {
+      onUploadProgress: (loaded, total = 0) => {
         currentUploaded.value = loaded
         currentProgress.value = Math.min(100, Math.round((loaded / total) * 100))
         currentStage.value = '上传文件'
