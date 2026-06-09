@@ -2,7 +2,9 @@ import datetime
 import os
 import uuid
 import threading
+import hashlib
 from pathlib import Path
+
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -15,9 +17,20 @@ from app.services.document_parser import extract_text
 from app.services.text_splitter import split_text
 from app.services.vector_store import add_document_chunks, delete_document_chunks
 
+def calculate_file_hash(file_path: str) -> str:
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
+
+
+def calculate_hash(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()
 
 
 def _update_task(task_id: str, db: Session, **kwargs):
@@ -43,6 +56,13 @@ def _process_upload_task(task_id: str, file_path: str, original_filename: str, e
 
         _update_task(task_id, db, progress=15, stage="切分文本")
 
+        # 计算文件哈希以检查重复
+        file_hash = calculate_file_hash(file_path)
+        existing_doc = db.query(Document).filter(Document.file_hash == file_hash).first()
+        if existing_doc:
+            _update_task(task_id, db, status="completed", progress=100, stage="检测到重复文件，直接使用现有索引", doc_id=existing_doc.id)
+            return
+
         chunks = split_text(pages, settings.chunk_size, settings.chunk_overlap)
         if not chunks:
             raise ValueError("文本切分失败")
@@ -55,6 +75,7 @@ def _process_upload_task(task_id: str, file_path: str, original_filename: str, e
             file_path=file_path,
             file_type=ext[1:],
             file_size=os.path.getsize(file_path),
+            file_hash=calculate_file_hash(file_path),
             chunk_count=len(chunks),
             content_preview=content_preview,
         )
@@ -215,6 +236,14 @@ async def upload_files(files: list[UploadFile] = File(...), db: Session = Depend
             with open(file_path, "wb") as f:
                 f.write(content)
 
+            # 计算哈希检查重复
+            file_hash = calculate_file_hash(file_path)
+            existing_doc = db.query(Document).filter(Document.file_hash == file_hash).first()
+            if existing_doc:
+                os.remove(file_path) # 删除重复上传的文件
+                results.append(existing_doc)
+                continue
+
             pages = extract_text(file_path)
             if not pages:
                 raise HTTPException(400, f"Failed to extract text from {file.filename}")
@@ -229,6 +258,7 @@ async def upload_files(files: list[UploadFile] = File(...), db: Session = Depend
                 file_path=file_path,
                 file_type=ext[1:],
                 file_size=file_size,
+                file_hash=calculate_file_hash(file_path),
                 chunk_count=len(chunks),
                 content_preview=content_preview,
             )

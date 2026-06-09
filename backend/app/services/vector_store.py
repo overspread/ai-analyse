@@ -2,13 +2,15 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 from langchain_nvidia_ai_endpoints import NVIDIAEmbeddings
 from typing import List, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.config import settings as app_settings
 
 _embedding = None
 _client = None
 _collection = None
 
-BATCH_SIZE = 10
+BATCH_SIZE = 50
+MAX_WORKERS = 5
 
 
 class MockEmbeddings:
@@ -60,42 +62,43 @@ def add_document_chunks(
     if not all(chunk["text"].strip() for chunk in chunks):
         raise ValueError("all chunks must have non-empty text")
     
-    try:
-        collection = _get_collection()
-        embedding = _get_embedding()
+    collection = _get_collection()
+    embedding = _get_embedding()
+    
+    if metadata:
+        metadatas = metadata
+    else:
+        metadatas = [
+            {"document_id": doc_id, "chunk_index": i, "page_number": c.get("page_number", 1)}
+            for i, c in enumerate(chunks)
+        ]
+    
+    total = len(chunks)
+    batches = []
+    for i in range(0, total, BATCH_SIZE):
+        batch = chunks[i:i + BATCH_SIZE]
+        batches.append({
+            "texts": [c["text"] for c in batch],
+            "ids": [f"doc{doc_id}_chunk{j}" for j in range(i, i + len(batch))],
+            "metadatas": metadatas[i:i + BATCH_SIZE],
+            "idx": i,
+        })
+    
+    completed = 0
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {}
+        for b in batches:
+            future = executor.submit(_embed_batch, embedding, b["texts"], b["ids"], b["metadatas"], collection)
+            futures[future] = b
         
-        if metadata:
-            metadatas = metadata
-        else:
-            metadatas = [
-                {"document_id": doc_id, "chunk_index": i, "page_number": c.get("page_number", 1)}
-                for i, c in enumerate(chunks)
-            ]
-        
-        total = len(chunks)
-        for i in range(0, total, BATCH_SIZE):
-            batch = chunks[i:i + BATCH_SIZE]
-            batch_texts = [c["text"] for c in batch]
-            batch_ids = [f"doc{doc_id}_chunk{j}" for j in range(i, i + len(batch))]
-            batch_metadatas = metadatas[i:i + BATCH_SIZE]
-            
-            vectors = embedding.embed_documents(batch_texts)
-            if not vectors or len(vectors) != len(batch):
-                raise ValueError("Failed to generate embeddings for batch")
-            
-            collection.add(
-                ids=batch_ids,
-                embeddings=vectors,
-                documents=batch_texts,
-                metadatas=batch_metadatas,
-            )
-            
+        for future in as_completed(futures):
+            exc = future.exception()
+            if exc:
+                raise ValueError(f"Failed to embed batch: {exc}")
+            completed += 1
             if progress_callback:
-                done = min(i + BATCH_SIZE, total)
-                pct = int((done / total) * 100)
+                pct = int((completed / len(batches)) * 100)
                 progress_callback(pct)
-    except Exception as e:
-        raise ValueError(f"Failed to add document chunks to vector store: {str(e)}")
 
 
 def search_chunks(query: str, doc_ids: Optional[List[int]] = None, top_k: int = 5):
@@ -131,3 +134,15 @@ def search_chunks(query: str, doc_ids: Optional[List[int]] = None, top_k: int = 
 def delete_document_chunks(doc_id: int):
     collection = _get_collection()
     collection.delete(where={"document_id": doc_id})
+
+
+def _embed_batch(embedding, texts, ids, metadatas, collection):
+    vectors = embedding.embed_documents(texts)
+    if not vectors or len(vectors) != len(texts):
+        raise ValueError("Failed to generate embeddings for batch")
+    collection.add(
+        ids=ids,
+        embeddings=vectors,
+        documents=texts,
+        metadatas=metadatas,
+    )

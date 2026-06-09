@@ -1,6 +1,6 @@
 # AI 分析助手
 
-基于 RAG（检索增强生成）的智能透析知识问答系统，支持上传 PDF/DOCX 文档，通过自然语言提问获取基于文档上下文的精准回答。
+基于 RAG（检索增强生成）的智能知识问答系统，支持上传 PDF/DOCX 文档，通过自然语言提问获取基于文档上下文的精准回答。
 
 ## 技术栈
 
@@ -57,6 +57,7 @@ NVIDIA_API_KEY=你的NVIDIA_API密钥
 启动服务：
 
 ```
+cd /Users/overspread/Developer/ai-analyse/backend && source ../.venv/bin/activate && python -m uvicorn app.main:app --reload --port 8000
 python -m uvicorn app.main:app --reload --port 8000
 ```
 

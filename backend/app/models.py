@@ -12,6 +12,7 @@ class Document(Base):
     file_path = Column(String(500), nullable=False)
     file_type = Column(String(10), nullable=False)
     file_size = Column(Integer, nullable=False)
+    file_hash = Column(String(64), index=True, nullable=True)
     chunk_count = Column(Integer, default=0)
     content_preview = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
