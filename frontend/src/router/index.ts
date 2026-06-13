@@ -5,18 +5,12 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'Unified',
-      component: () => import('../views/PageUnified.vue'),
+      redirect: '/documents',
     },
     {
       path: '/documents',
-      name: 'Documents',
+      name: 'documents',
       component: () => import('../views/Documents.vue'),
-    },
-    {
-      path: '/chat',
-      name: 'Chat',
-      component: () => import('../views/Chat.vue'),
     },
   ],
 })

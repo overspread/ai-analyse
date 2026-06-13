@@ -5,14 +5,9 @@
         <n-config-provider :theme="isDark ? darkTheme : null" :locale="zhCN" :date-locale="dateZhCN">
           <n-layout position="absolute" :has-sider="true">
             <n-layout-header bordered style="height: 56px; display: flex; align-items: center; padding: 0 24px;">
-              <n-h3 style="margin: 0; flex: 1;">AI 解析助手</n-h3>
+              <n-space style="flex: 1;">
+              </n-space>
               <n-space>
-                <n-button :type="route.path === '/documents' ? 'primary' : 'default'" @click="$router.push('/documents')">
-                  文档管理
-                </n-button>
-                <n-button :type="route.path === '/chat' ? 'primary' : 'default'" @click="$router.push('/chat')">
-                  问答对话
-                </n-button>
                 <n-button quaternary circle @click="isDark = !isDark">
                   <template #icon>
                     <n-icon><div v-if="isDark">☀️</div><div v-else>🌙</div></n-icon>
